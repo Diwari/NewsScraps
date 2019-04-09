@@ -1,0 +1,121 @@
+//old routes readArticle not running
+router.get("/scrape", function(req, res){
+  request("http://www.theverge.com", function(error, response, html){
+    let $ = cheerio.load(html);
+    let titlesArray = [];
+
+    $(".c-entry-box--compact__title").each(function(i, element){
+      let result = {};
+
+      result.title = $(this)
+        .children("a")
+        .text();
+      result.link = $(this)
+        .children("a")
+        .attr("href");
+      if(result.title !== "" && result.link !==""){
+        if(titlesArray.indexOf(result.title) == -1){
+          titlesArray.push(result.title);
+
+          Article.count({ title: result.title}, function(err, test){
+            if(test === 0){
+              let entry = new Article(result);
+
+              entry.save(function(err, doc){
+                if (err){
+                  console.log(err);
+                } else {
+                  console.log(doc);
+                }
+              })
+            }
+          })
+        }else{
+          console.log("Article already exists.");
+        }
+      } else {
+        console.log("Not saved to DB, missing data");
+      }
+    });
+    res.redirect("/articles"); 
+  });
+});
+router.get("/articles", function(rep,res){
+  Article.find().sort({ _id: -1}).exec(function(err,doc){
+    if(err){
+      console.log(err);
+    } else{
+      let artcl = { article: doc };
+      res.render("index", artcl);
+    }
+  });
+});
+
+router.get("/articles-json", function(req,res){
+  Article.find({}, function(err,doc){
+    if (err){
+      console.log(err);
+    } else {
+      res.json(doc);
+    }
+  });
+});
+
+router.get("/clearAll", function(req,res){
+  Article.remove({}, function(err, doc){
+    if (err){
+      console.log(err);
+    } else {
+      console.log("remove all articles");
+    }
+  });
+  res.redirect("/articles-json");
+
+});
+
+router.get("/readArticle/:id", function(req, res){
+  let articleId = req.params.id;
+  let hbsObj = {
+    article: "",
+    body: ""
+  };
+  let link = "";
+  let content = "";
+  Article.findOne({ _id: articleId})
+    .populate("comment")
+    .exec(function(err, doc) {
+      if (err) {
+        console.log("Error: " + err);
+      } else {
+        console.log(doc, "test to see if this executes ")
+        hbsObj.article = doc;
+        link = doc.link;
+        request(link, function(error,response, html){
+          let $ = cheerio.load(html);
+          console.log($, 'hay, it\'s cheerio')
+          content =  $(".l-col_main").each(function(i, element){
+            console.log(element, "element Test")
+            hbsObj.body = $(this)
+            .children(".c-entry-content")
+            .children("p")
+            .text(); 
+            console.log(content, 'article from page');
+            return false;
+          });
+        });
+      }
+    })
+
+
+          res.render("article", hbsObj);
+        });
+
+router.post("/comment/:id", function(req,res){
+  let user = req.body.name;
+  let content = req.body.comment;
+  let articeId = req.params.id;
+
+  let commentObj = {
+    name: user,
+    body: content
+  };
