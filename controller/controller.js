@@ -6,8 +6,7 @@ let axios= require("axios");
 let request = require("request");
 let cheerio = require("cheerio");
 
-let Comment = require("../models/comment.js");
-let Article = require("../models/articles.js");
+
 let db = require("../models");
 
     
@@ -37,7 +36,7 @@ router.get("/scrape", function(req, res){
           if(titlesArray.indexOf(result.title) == -1){
             titlesArray.push(result.title);
   
-            Article.count({ title: result.title}, function(err, test){
+            db.Article.count({ title: result.title}, function(err, test){
               if(test === 0){
                 let entry = new Article(result);
   
@@ -62,10 +61,13 @@ router.get("/scrape", function(req, res){
     
   });
 });
-router.get("/articles", function(res,req){
+router.get("/articles", function(req,res){
   db.Article.find({}).sort({_id:-1})
     .then(function(dbArticle){
-      res.render("index", dbArticle)
+      let object = {
+        article: dbArticle
+      }
+      res.render("index", object)
       console.log(dbArticle);
     })
     .catch(function(err){
@@ -76,7 +78,7 @@ router.get("/articles", function(res,req){
 router.get("/articles/:id", function(req,res){
   var articleId = req.params.id;
   var hbsObj = {
-    article:"",
+    article:Article,
     body:""
   };
   var link = "";
